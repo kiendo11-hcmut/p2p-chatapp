@@ -12,7 +12,9 @@ import threading
 import json
 import uuid
 import sys
+from colorama import init, Fore, Style
 
+init(autoreset=True)
 class PeerClient:
     def __init__(self, tracker_host, tracker_port, listen_port, username='Anonymous'):
         self.tracker_host = tracker_host
@@ -24,8 +26,7 @@ class PeerClient:
         self.channels = []
         self.running = True
         self.current_channel = None
-        print(f"[Peer] Initialized as {username} (ID: {self.peer_id})")
-
+        print(Fore.CYAN + f"[Peer] Initialized as {username} (ID: {self.peer_id})")
     def get_local_ip(self):
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -47,7 +48,7 @@ class PeerClient:
             sock.close()
             return json.loads(response)
         except Exception as e:
-            print(f"[Peer] Error contacting tracker: {e}")
+            print(Fore.RED + f"[Peer] Error contacting tracker: {e}")
             return {'status': 'error', 'message': str(e)}
 
     def register(self):
@@ -59,9 +60,9 @@ class PeerClient:
         }
         response = self.send_to_tracker('register', data)
         if response.get('status') == 'success':
-            print(f"[Peer] Registered with tracker successfully")
+            print(Fore.GREEN + "[Peer] Registered with tracker successfully")
         else:
-            print(f"[Peer] Registration failed: {response.get('message')}")
+            print(Fore.RED + f"[Peer] Registration failed: {response.get('message')}")
         return response
 
     def join_channel(self, channel_name):
@@ -71,10 +72,10 @@ class PeerClient:
             if channel_name not in self.channels:
                 self.channels.append(channel_name)
             self.current_channel = channel_name
-            print(f"[Peer] Joined channel: {channel_name}")
+            print(Fore.GREEN + f"[Peer] Joined channel: {channel_name}")
             self.connect_to_channel_peers(channel_name)
         else:
-            print(f"[Peer] Failed to join channel: {response.get('message')}")
+            print(Fore.RED + f"[Peer] Failed to join channel: {response.get('message')}")
         return response
 
     def connect_to_channel_peers(self, channel):
@@ -96,8 +97,9 @@ class PeerClient:
             thread = threading.Thread(target=self.listen_to_peer, args=(peer_id, sock))
             thread.daemon = True
             thread.start()
+            print(Fore.MAGENTA + f"[P2P] Connected to {username} ({peer_id})")
         except Exception as e:
-            print(f"[P2P] Failed to connect to {peer_id}: {e}")
+            print(Fore.RED + f"[P2P] Failed to connect to {peer_id}: {e}")
 
     def listen_to_peer(self, peer_id, sock):
         try:
@@ -123,10 +125,10 @@ class PeerClient:
             sender = message.get('username', peer_id)
             content = message.get('content', '')
             # Hiển thị tin nhắn peer chuẩn format
-            print(f"\n[{sender} @{channel}]> {content}")
+            print(Fore.YELLOW + f"\n[{sender} @{channel}]> {content}")
             # Hiển thị lại prompt nhập tin nhắn cho user
             if self.current_channel == channel:
-                print(f"{self.username} @{self.current_channel}> ", end='', flush=True)
+                print(Fore.CYAN + f"{self.username} @{self.current_channel}> ", end='', flush=True)
 
     def send_message(self, channel, content):
         message = {'type':'chat', 'channel': channel, 'peer_id': self.peer_id, 'username': self.username, 'content': content}
@@ -152,7 +154,7 @@ class PeerClient:
                 except:
                     continue
         except Exception as e:
-            print(f"[P2P] Listener error: {e}")
+            print(Fore.RED + f"[P2P] Listener error: {e}")
 
     def handle_incoming_connection(self, conn):
         try:
