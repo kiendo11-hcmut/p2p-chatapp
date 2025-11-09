@@ -37,102 +37,63 @@ class ChatWebApp:
     
     def setup_routes(self):
         """Setup all RESTful routes for the chat application."""
-        
+
         @self.app.route('/login', methods=['POST'])
         def login(headers="guest", body="anonymous"):
-            """
-            Handle user login.
-            
-            Expected body: {"username": "user1", "password": "pass123"}
-            """
             try:
                 data = json.loads(body) if body and body != "anonymous" else {}
-                username = data.get('username', '')
-                password = data.get('password', '')
-                
-                # Simple validation (in production, use proper authentication)
+                username = data.get('username', '').strip()
+                password = data.get('password', '').strip()
                 if username and password:
-                    response = {
-                        'status': 'success',
-                        'message': 'Login successful',
-                        'username': username,
-                        'token': f'token_{username}'  # Simplified token
-                    }
-                else:
-                    response = {
-                        'status': 'error',
-                        'message': 'Invalid credentials'
-                    }
-                
-                return json.dumps(response)
+                    token = f"token_{username}"
+                    self.sessions[token] = {'username': username, 'peer_id': None, 'channels': [], 'current_channel': None}
+                    return json.dumps({'status':'success','message':'Login successful','username':username,'token':token})
+                return json.dumps({'status':'error','message':'Invalid credentials'})
             except Exception as e:
-                return json.dumps({
-                    'status': 'error',
-                    'message': str(e)
-                })
+                return json.dumps({'status':'error','message':str(e)})
         
         @self.app.route('/register-peer', methods=['POST'])
         def register_peer(headers="guest", body="anonymous"):
-            """
-            Register a peer with the tracker server.
-            
-            Expected body: {
-                "peer_id": "uuid",
-                "ip": "192.168.1.100",
-                "port": 9001,
-                "username": "user1"
-            }
-            """
             try:
-                data = json.loads(body) if body and body != "anonymous" else {}
-                
-                # Forward request to tracker server
+                data = json.loads(body)
+                token = data.get('token')
+                if not token or token not in self.sessions:
+                    return json.dumps({'status':'error','message':'Invalid session'})
+                self.sessions[token]['peer_id'] = data.get('peer_id')
                 response = self.send_to_tracker('register', data)
                 return json.dumps(response)
             except Exception as e:
-                return json.dumps({
-                    'status': 'error',
-                    'message': str(e)
-                })
+                return json.dumps({'status':'error','message':str(e)})
+
         
         @self.app.route('/get-peers', methods=['POST'])
         def get_peers(headers="guest", body="anonymous"):
-            """
-            Get list of active peers, optionally filtered by channel.
-            
-            Expected body: {
-                "channel": "general"  (optional)
-            }
-            """
             try:
-                data = json.loads(body) if body and body != "anonymous" else {}
+                data = json.loads(body)
+                token = data.get('token')
+                if not token or token not in self.sessions:
+                    return json.dumps({'status':'error','message':'Invalid session'})
+                data['channel'] = self.sessions[token]['current_channel']
                 response = self.send_to_tracker('get_peers', data)
                 return json.dumps(response)
             except Exception as e:
-                return json.dumps({
-                    'status': 'error',
-                    'message': str(e)
-                })
-        
+                return json.dumps({'status':'error','message':str(e)})
+            
         @self.app.route('/join-channel', methods=['POST'])
         def join_channel(headers="guest", body="anonymous"):
-            """
-            Join a chat channel.
-            
-            Expected body: {
-                "peer_id": "uuid",
-                "channel": "general"
-            }
-            """
             try:
-                data = json.loads(body) if body and body != "anonymous" else {}
+                data = json.loads(body)
+                token = data.get('token')
+                if not token or token not in self.sessions:
+                    return json.dumps({'status':'error','message':'Invalid session'})
+                channel = data.get('channel')
+                self.sessions[token]['current_channel'] = channel
+                if channel not in self.sessions[token]['channels']:
+                    self.sessions[token]['channels'].append(channel)
                 response = self.send_to_tracker('join_channel', data)
                 return json.dumps(response)
             except Exception as e:
-                return json.dumps({
-                    'status': 'error',
-                    'message': str(e)
-                })
+                return json.dumps({'status':'error','message':str(e)})
         
         @self.app.route('/leave-channel', methods=['POST'])
         def leave_channel(headers="guest", body="anonymous"):

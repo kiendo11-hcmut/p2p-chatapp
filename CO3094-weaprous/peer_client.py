@@ -87,13 +87,13 @@ class PeerClient:
                 if peer_id != self.peer_id and peer_id not in self.connections:
                     self.connect_to_peer(peer_id, peer_info['ip'], peer_info['port'], peer_info.get('username', 'Unknown'))
 
-    def connect_to_peer(self, peer_id, ip, port, username='Unknown'):
+    def connect_to_peer(self, peer_id, ip, port, username='Unknown', channels = None):
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((ip, port))
-            handshake = {'type': 'handshake', 'peer_id': self.peer_id, 'username': self.username}
+            handshake = {'type': 'handshake', 'peer_id': self.peer_id, 'username': self.username, 'channels': self.channels}
             sock.send(json.dumps(handshake).encode('utf-8'))
-            self.connections[peer_id] = {'socket': sock, 'username': username}
+            self.connections[peer_id] = {'socket': sock, 'username': username, 'channels': handshake.get('channels', [])}
             thread = threading.Thread(target=self.listen_to_peer, args=(peer_id, sock))
             thread.daemon = True
             thread.start()
@@ -124,23 +124,36 @@ class PeerClient:
             channel = message.get('channel', 'unknown')
             sender = message.get('username', peer_id)
             content = message.get('content', '')
-            # Hiển thị tin nhắn peer chuẩn format
-            print(Fore.YELLOW + f"\n[{sender} @{channel}]> {content}")
-            # Hiển thị lại prompt nhập tin nhắn cho user
+            
             if self.current_channel == channel:
+                print(Fore.YELLOW + f"\n[{sender} @{channel}]> {content}")
                 print(Fore.CYAN + f"{self.username} @{self.current_channel}> ", end='', flush=True)
 
     def send_message(self, channel, content):
         message = {'type':'chat', 'channel': channel, 'peer_id': self.peer_id, 'username': self.username, 'content': content}
         message_json = json.dumps(message).encode('utf-8')
         for peer_id, pdata in list(self.connections.items()):
-            try:
-                pdata['socket'].send(message_json)
-            except:
+            try:             
+                if channel in pdata.get('channels', []):
+                    pdata['socket'].send(message_json)
+            except Exception as e:
                 del self.connections[peer_id]
-
+    
+    def is_port_free(self, port):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind(('0.0.0.0', port))
+            s.close()
+            return True
+        except OSError:
+            return False
+    
     def start_listening(self):
         try:
+            if not self.is_port_free(self.listen_port):
+                print(Fore.RED + f"[P2P] Port {self.listen_port} is already in use. Exiting.")
+                self.running = False
+                return
             server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             server_socket.bind(('0.0.0.0', self.listen_port))
@@ -163,10 +176,14 @@ class PeerClient:
             if handshake.get('type') == 'handshake':
                 peer_id = handshake.get('peer_id')
                 username = handshake.get('username', 'Unknown')
-                self.connections[peer_id] = {'socket': conn, 'username': username}
+                peer_channels = handshake.get('channels', [])
+                self.connections[peer_id] = {'socket': conn, 'username': username, 'channels': peer_channels}
                 thread = threading.Thread(target=self.listen_to_peer, args=(peer_id, conn))
                 thread.daemon = True
                 thread.start()
+                for ch in peer_channels:
+                    if ch not in self.channels and peer_id not in self.connections:
+                        self.connect_to_peer(peer_id, conn.getpeername()[0], conn.getpeername()[1], username, channels=peer_channels)
         except:
             conn.close()
 
@@ -196,6 +213,14 @@ def main():
     listen_port = int(input("Your listen port (default: 9001): ").strip() or '9001')
 
     peer = PeerClient(tracker_host, tracker_port, listen_port, username)
+    
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(('0.0.0.0', listen_port))
+        s.close()
+    except OSError:
+        print(Fore.RED + f"[P2P] Port {listen_port} is already in use. Exiting.")
+        return 
     peer.register()
 
     listener_thread = threading.Thread(target=peer.start_listening)

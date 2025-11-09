@@ -20,7 +20,7 @@ TRACKER_PORT = 7000
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        prog='ChatWebApp',
+        prog='ChatApp',
         description='Chat Web Application with RESTful APIs',
         epilog='Provides HTTP interface to the chat tracker server'
     )
