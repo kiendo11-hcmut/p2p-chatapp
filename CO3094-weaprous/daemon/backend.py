@@ -80,8 +80,9 @@ def run_backend(ip, port, routes):
         server.bind((ip, port))
         server.listen(50)
         print("[Backend] Listening on port {}".format(port))
-        if routes != {}:
-            print("[Backend] route settings {}".format(routes))
+        if routes:
+            for (method, path), func in routes.items():
+                print(f"[Backend] {method} {path} -> {func.__name__}")
 
         while True:
             conn, addr = server.accept()

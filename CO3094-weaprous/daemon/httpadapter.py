@@ -96,8 +96,8 @@ class HttpAdapter:
             req.prepare(msg, routes)
             print(f"[Request] {req.method} path {req.path} version {req.version}")
 
-            # 🔥 TRẢ VỀ RESPONSE ĐƠN GIẢN (test)
-            html = "<html><body><h1>Server OK ✅</h1><p>You requested: {}</p></body></html>".format(req.path)
+            # TRẢ VỀ RESPONSE ĐƠN GIẢN (test)
+            html = "<html><body><h1>Server OK </h1><p>You requested: {}</p></body></html>".format(req.path)
             response = (
                 "HTTP/1.1 200 OK\r\n"
                 "Content-Type: text/html; charset=utf-8\r\n"
